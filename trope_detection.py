@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 from datetime import datetime
 import logging
+from os.path import join
 import re
 from typing import Dict, List
 
@@ -12,7 +13,7 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 from data_prep.load_movie_script_data import get_clean_timos_tropes, preprocess_movie_script_data
 from models.train_classifier import train_eval_classifiers
-from utils.utils import DATA_DIR, configure_logging
+from utils.utils import DATA_DIR, OUT_DIR, configure_logging
 
 
 logger = logging.getLogger(__name__)
@@ -29,24 +30,34 @@ def trope_detection_tfidf(movie_script_dialog: Dict[str, str], movie_tropes_dict
 	d2v_xgb_metrics = defaultdict(str)
 
 	d2v_rf_metrics['AP'] = []
-	d2v_xgb_metrics['AUC'] = []
+	d2v_rf_metrics['AUC'] = []
 
-	d2v_rf_metrics['AP'] = []
+	d2v_xgb_metrics['AP'] = []
 	d2v_xgb_metrics['AUC'] = []
-
-	tfidf_xgb_metrics['AP'] = []
-	tfidf_xgb_metrics['AUC'] = []
 
 	tfidf_rf_metrics['AP'] = []
 	tfidf_rf_metrics['AUC'] = []
 
+	tfidf_xgb_metrics['AP'] = []
+	tfidf_xgb_metrics['AUC'] = []
+
 	rf_estimators = 200
 	xgb_estimators = 200
 
-	for trope in trope_of_interest:
+	for idx, trope in enumerate(trope_of_interest):
 		multi_label = MultiLabelBinarizer()
 		y = multi_label.fit_transform([set(movie_tropes) for movie_tropes in movie_tropes_dict.values()])
 		trope_idx = trope_idx = list(multi_label.classes_).index(trope)
+
+		tfidf_rf_auc = 0
+		tfidf_rf_ap = 0
+		tfidf_xgb_auc = 0
+		tfidf_xgb_ap = 0
+
+		d2v_rf_auc = 0
+		d2v_rf_ap = 0
+		d2v_xgb_auc = 0
+		d2v_xgb_ap = 0
 
 		if y[:, trope_idx].sum() < 2:
 			logger.info(f"Skipping trope {trope} with less than 2 instances")
@@ -55,7 +66,7 @@ def trope_detection_tfidf(movie_script_dialog: Dict[str, str], movie_tropes_dict
 		if train_tfidf:
 			X_train_docs, X_test_docs, y_train, y_test = train_test_split(list(movie_script_dialog.values()), y[:, trope_idx], train_size=0.8, stratify=y[:, trope_idx])
 
-			logger.info(f"{trope} distribution: train ({np.bincount(y_train)}), test ({np.bincount(y_test)})")
+			logger.info(f"{idx+1}) {trope} distribution: train ({np.bincount(y_train)}), test ({np.bincount(y_test)})")
 
 			X_train_tfidf_docs = [' '.join(list(x)) for x in X_train_docs]
 			X_test_tfidf_docs = [' '.join(list(x)) for x in X_test_docs]
@@ -64,13 +75,8 @@ def trope_detection_tfidf(movie_script_dialog: Dict[str, str], movie_tropes_dict
 			X_tfidf_train_vec = tfidf_fit.transform(X_train_tfidf_docs)
 			X_tfidf_test_vec = tfidf_fit.transform(X_test_tfidf_docs)
 
-			rf_auc, rf_ap = train_eval_classifiers(X_tfidf_train_vec, X_tfidf_test_vec, y_train, y_test, classifier='rf', n_estimators = rf_estimators)
-			xgb_auc, xgb_ap = train_eval_classifiers(X_tfidf_train_vec, X_tfidf_test_vec, y_train, y_test, n_estimators = xgb_estimators)
-
-			tfidf_rf_metrics['AUC'].append(rf_auc)
-			tfidf_rf_metrics['AP'].append(rf_ap)
-			tfidf_xgb_metrics['AUC'].append(xgb_auc)
-			tfidf_xgb_metrics['AP'].append(xgb_ap)
+			tfidf_rf_auc, tfidf_rf_ap = train_eval_classifiers(X_tfidf_train_vec, X_tfidf_test_vec, y_train, y_test, classifier='rf', n_estimators = rf_estimators)
+			tfidf_xgb_auc, tfidf_xgb_ap = train_eval_classifiers(X_tfidf_train_vec, X_tfidf_test_vec, y_train, y_test, n_estimators = xgb_estimators)
 
 		if train_d2v:
 			documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(movie_script_dialog.values())]
@@ -99,13 +105,18 @@ def trope_detection_tfidf(movie_script_dialog: Dict[str, str], movie_tropes_dict
 			X_train_dv.columns = np.arange(X_train_dv.shape[1])
 			X_test_dv.columns = np.arange(X_test_dv.shape[1])
 
-			rf_auc, rf_ap = train_eval_classifiers(X_train_dv, X_test_dv, y_train, y_test, classifier='rf')
-			xgb_auc, xgb_ap = train_eval_classifiers(X_train_dv, X_test_dv, y_train, y_test)
+			d2v_rf_auc, d2v_rf_ap = train_eval_classifiers(X_train_dv, X_test_dv, y_train, y_test, classifier='rf')
+			d2v_xgb_auc, d2v_xgb_ap = train_eval_classifiers(X_train_dv, X_test_dv, y_train, y_test)
 
-			d2v_rf_metrics['AUC'].append(rf_auc)
-			d2v_rf_metrics['AP'].append(rf_ap)
-			d2v_xgb_metrics['AUC'].append(xgb_auc)
-			d2v_xgb_metrics['AP'].append(xgb_ap)
+		tfidf_rf_metrics['AUC'].append(tfidf_rf_auc)
+		tfidf_rf_metrics['AP'].append(tfidf_rf_ap)
+		tfidf_xgb_metrics['AUC'].append(tfidf_xgb_auc)
+		tfidf_xgb_metrics['AP'].append(tfidf_xgb_ap)
+
+		d2v_rf_metrics['AUC'].append(d2v_rf_auc)
+		d2v_rf_metrics['AP'].append(d2v_rf_ap)
+		d2v_xgb_metrics['AUC'].append(d2v_xgb_auc)
+		d2v_xgb_metrics['AP'].append(d2v_xgb_ap)
 
 	return tfidf_rf_metrics, tfidf_xgb_metrics, d2v_rf_metrics, d2v_xgb_metrics
 
@@ -135,7 +146,6 @@ if __name__ == "__main__":
 	logger.info(f"Running trope detection...")
 	tfidf_rf_metrics, tfidf_xgb_metrics, d2v_rf_metrics, d2v_xgb_metrics = trope_detection_tfidf(movie_script_dialog, movie_tropes_dict, tfidf_vocab_size, 
 		d2v_dim, tropes_of_interest, train_tfidf, train_d2v)
-	logger.info(f"Completed training and evaluating models. Time taken: {(datetime.now() - start_time).seconds}")
 
 	if train_tfidf:
 		logger.info("Results from Tf-Idf features")
@@ -144,8 +154,11 @@ if __name__ == "__main__":
 		logger.info(f"Mean AP: {round(np.mean(tfidf_rf_metrics['AP']), 2)} ({round(np.std(tfidf_rf_metrics['AP']), 2)})")
 
 		logger.info("Xgboost")
-		logger.info(f"Mean AUC: {round(np.mean(tfidf_rf_metrics['AUC']), 2)} ({round(np.std(tfidf_rf_metrics['AUC']), 2)})")
-		logger.info(f"Mean AP: {round(np.mean(tfidf_rf_metrics['AP']), 2)} ({round(np.std(tfidf_rf_metrics['AP']), 2)})")
+		logger.info(f"Mean AUC: {round(np.mean(tfidf_xgb_metrics['AUC']), 2)} ({round(np.std(tfidf_xgb_metrics['AUC']), 2)})")
+		logger.info(f"Mean AP: {round(np.mean(tfidf_xgb_metrics['AP']), 2)} ({round(np.std(tfidf_xgb_metrics['AP']), 2)})")
+
+		pd.DataFrame(zip(tropes_of_interest, tfidf_rf_metrics['AUC'], tfidf_xgb_metrics['AUC'], tfidf_rf_metrics['AP'], tfidf_xgb_metrics['AP']),
+		 columns=["Trope", "RandomForest_AUC", "Xgboost_AUC", "RandomForest_AP", "Xgboost_AP"]).to_csv(join(OUT_DIR, 'TfIdf_Results.csv'), index=False)
 
 	if train_d2v:
 		logger.info("Results from Doc2Vec features")
@@ -156,3 +169,5 @@ if __name__ == "__main__":
 		logger.info("Xgboost")
 		logger.info(f"Mean AUC: {round(np.mean(d2v_xgb_metrics['AUC']), 2)} ({round(np.std(d2v_xgb_metrics['AUC']), 2)})")
 		logger.info(f"Mean AP: {round(np.mean(d2v_xgb_metrics['AP']), 2)} ({round(np.std(d2v_xgb_metrics['AP']), 2)})")
+
+	logger.info(f"Completed training and evaluating models. Time taken: {(datetime.now() - start_time).seconds} seconds")

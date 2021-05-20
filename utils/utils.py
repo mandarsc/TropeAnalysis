@@ -1,6 +1,9 @@
 import logging
+from os.path import join
 
-DATA_DIR = '/home/mandar/Data/NCSU/TropeAnalysis/TropesDataset'
+HOME_DIR = '/home/mandar/Data/NCSU/TropeAnalysis/'
+DATA_DIR = join(HOME_DIR, 'TropesDataset')
+OUT_DIR = join(HOME_DIR, 'TropeAnalysis', 'output')
 
 
 def configure_logging(logger):
