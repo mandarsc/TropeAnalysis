@@ -1,0 +1,6 @@
+gensim
+numpy
+pandas
+matplotlib
+sklearn
+xgboost
