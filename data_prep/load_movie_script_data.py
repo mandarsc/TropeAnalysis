@@ -147,7 +147,7 @@ def parse_movie_dialog_data(movie_json_data: List[List[Dict[str, str]]],
                 character = dialog_speaker.split('(')[0].strip()
                 movie_characters = movie_characters.union([character])
                 dialogs_per_character[character] += 1
-                movie_dialogs.append(dialog_info['text'])
+            movie_dialogs.append(dialog_info['text'])
 
     movie_info_dict['characters'] = movie_characters
     movie_info_dict['actor_dialog_count'] = dialogs_per_character
@@ -169,7 +169,7 @@ def preprocess_movie_script_data():
     movie_tropes_df = movie_tropes_df.drop_duplicates(subset=['Movies', 'Tropes'])
     logger.info(f"Movies with tropes: {len(movie_tropes_df)}")
 
-    logger.info("Read TvTropes Json file")
+    logger.info("Read TVTropes Json file")
     tvtropes_json_dict = read_tvtropes_json_file()
 
     for movie_row in movie_tropes_df.iterrows():
@@ -180,17 +180,20 @@ def preprocess_movie_script_data():
         
         # Parse movie dialogs and preprocess text
         all_raw_movie_dialogs[movie] = parse_movie_dialog_data(movie_json_data)
-        all_preprocess_movie_dialogs[movie] = preprocess_string(all_raw_movie_dialogs[movie]['dialogs'], custom_filters)
-
-        # Collect list of tropes for the movie
-        movie_trope_dict[movie] = tvtropes_json_dict[movie_row[1].Tropes]
+        preprocess_movie_dialog = preprocess_string(all_raw_movie_dialogs[movie]['dialogs'], custom_filters)
+        if len(preprocess_movie_dialog) > 0:
+            all_preprocess_movie_dialogs[movie] = preprocess_movie_dialog
+            # Collect list of tropes for the movie
+            movie_trope_dict[movie] = tvtropes_json_dict[movie_row[1].Tropes]
 
     # For each movie filter out tropes which appear in less than min_trope_count movies
     movie_tropes_subset_dict = defaultdict()
     all_movie_dialogs_subset = defaultdict()
     for movie, trope in movie_trope_dict.items():
         if len(trope) == 0:
-            logger.info(f'{movie} has no tropes in json file')
+            logger.info(f'{movie} has no tropes in json file.')
+        elif len(all_preprocess_movie_dialogs[movie])==0:
+            logger.info(f"{movie} has no movie script data.")
         else:
             movie_tropes_subset_dict[movie] = list(trope)
             all_movie_dialogs_subset[movie] = all_preprocess_movie_dialogs[movie]

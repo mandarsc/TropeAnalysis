@@ -1,7 +1,7 @@
 import logging
 from os.path import join
 
-HOME_DIR = '/home/mandar/Data/NCSU/TropeAnalysis/'
+HOME_DIR = '/home/mandar/Mandar/Tropes/'
 DATA_DIR = join(HOME_DIR, 'TropesDataset')
 OUT_DIR = join(HOME_DIR, 'TropeAnalysis', 'output')
 
