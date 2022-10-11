@@ -37,7 +37,7 @@ def extract_tfidf_features(X_train_docs: List[List[str]], X_test_docs: List[List
 	return X_train_tfidf, X_test_tfidf
 
 
-def extract_doc2vec_features(X_train_docs: List[TaggedDocument], X_test_docs: List[TaggedDocument]) -> Dict[str, pd.DataFrame]:
+def extract_doc2vec_features(X_train_docs: List[TaggedDocument], X_test_docs: List[TaggedDocument], d2v_size: int) -> Dict[str, pd.DataFrame]:
 	"""
 	"""
 	dm_model = Doc2Vec(X_train_docs, vector_size=d2v_size, min_count=5, dm=1, dm_mean=1, dm_concat=0)
@@ -62,13 +62,13 @@ def extract_doc2vec_features(X_train_docs: List[TaggedDocument], X_test_docs: Li
 		X_test_dm_concat.append(dm_concat_model.infer_vector(X_test_docs[i][0]))
 		X_test_dbow.append(dbow_model.infer_vector(X_test_docs[i][0]))
 
-	X_train_dm_df = pd.DataFrame(X_train_dm, columns=np.arange(len(X_train_docs)))
-	X_train_dm_concat_df = pd.DataFrame(X_train_dm_concat, columns=np.arange(len(X_train_docs)))
-	X_train_dbow_df = pd.DataFrame(X_train_dbow, columns=np.arange(len(X_train_docs)))
+	X_train_dm_df = pd.DataFrame(X_train_dm, columns=np.arange(d2v_size))
+	X_train_dm_concat_df = pd.DataFrame(X_train_dm_concat, columns=np.arange(d2v_size))
+	X_train_dbow_df = pd.DataFrame(X_train_dbow, columns=np.arange(d2v_size))
 
-	X_test_dm_df = pd.DataFrame(X_test_dm, columns=np.arange(len(X_test_docs)))
-	X_test_dm_concat_df = pd.DataFrame(X_test_dm_concat, columns=np.arange(len(X_test_docs)))
-	X_test_dbow_df = pd.DataFrame(X_test_dbow, columns=np.arange(len(X_test_docs)))
+	X_test_dm_df = pd.DataFrame(X_test_dm, columns=np.arange(d2v_size))
+	X_test_dm_concat_df = pd.DataFrame(X_test_dm_concat, columns=np.arange(d2v_size))
+	X_test_dbow_df = pd.DataFrame(X_test_dbow, columns=np.arange(d2v_size))
 
 	return {
 	"d2v_dm_train": X_train_dm_df, "d2v_dm_concat_train": X_train_dm_concat_df, "d2v_dbow_train": X_train_dbow_df,
@@ -121,15 +121,15 @@ def trope_detection(movie_script_dialog: Dict[str, str], movie_tropes_dict: Dict
 				documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(movie_script_dialog.values())]
 				X_train_docs, X_test_docs, y_train, y_test = train_test_split(documents, y[:, trope_idx], shuffle=True, train_size=0.8, stratify=y[:, trope_idx], random_state=random_state[i])
 
-				X_d2v_docs = extract_doc2vec_features(X_train_docs, X_test_docs)
+				X_d2v_docs = extract_doc2vec_features(X_train_docs, X_test_docs, d2v_size)
 
-				d2v_dm_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_train"], X_test_dv["d2v_dm_test"], y_train, y_test, classifier='rf')
-				d2v_dm_concat_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_concat_train"], X_test_dv["d2v_dm_concat_test"], y_train, y_test, classifier='rf')
-				d2v_dbow_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dbow_train"], X_test_dv["d2v_dbow_test"], y_train, y_test, classifier='rf')
+				d2v_dm_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_train"], X_d2v_docs["d2v_dm_test"], y_train, y_test, classifier='rf')
+				d2v_dm_concat_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_concat_train"], X_d2v_docs["d2v_dm_concat_test"], y_train, y_test, classifier='rf')
+				d2v_dbow_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dbow_train"], X_d2v_docs["d2v_dbow_test"], y_train, y_test, classifier='rf')
 				
-				d2v_dm_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_train"], X_test_dv["d2v_dm_test"], y_train, y_test)
-				d2v_dm_concat_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_concat_train"], X_test_dv["d2v_dm_concat_test"], y_train, y_test)
-				d2v_dbow_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dbow_train"], X_test_dv["d2v_dbow_test"], y_train, y_test)
+				d2v_dm_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_train"], X_d2v_docs["d2v_dm_test"], y_train, y_test)
+				d2v_dm_concat_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_concat_train"], X_d2v_docs["d2v_dm_concat_test"], y_train, y_test)
+				d2v_dbow_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dbow_train"], X_d2v_docs["d2v_dbow_test"], y_train, y_test)
 
 				d2v_dm_rf_metrics[i] = d2v_dm_rf_metrics_dict
 				d2v_dm_concat_rf_metrics[i] = d2v_dm_rf_metrics_dict
@@ -174,27 +174,39 @@ if __name__ == "__main__":
 		metrics_dict = trope_detection(movie_script_dialog, movie_tropes_dict, tfidf_vocab_size, d2v_dim, trope, train_tfidf, train_d2v)
 
 		if train_tfidf:
+			tfidf_rf_metrics = pd.DataFrame(metrics_dict['tfidf-rf']).T
+			tfidf_xgb_metrics = pd.DataFrame(metrics_dict['tfidf-xgb']).T
+
 			logger.info("Results from Tf-Idf features")
 			logger.info("Random Forest")
-			logger.info(f"Mean AUC: {round(np.mean(tfidf_rf_metrics['AUC']), 2)} ({round(np.std(tfidf_rf_metrics['AUC']), 2)})")
-			logger.info(f"Mean AP: {round(np.mean(tfidf_rf_metrics['AP']), 2)} ({round(np.std(tfidf_rf_metrics['AP']), 2)})")
-			logger.info(f"Mean F1: {round(np.mean(tfidf_rf_metrics['F1']), 2)} ({round(np.std(tfidf_rf_metrics['F1']), 2)})")
-			logger.info(f"Null Model F1: {round(np.mean(tfidf_rf_metrics['Null model']), 2)} ({round(np.std(tfidf_rf_metrics['Null model']), 2)})")
-			logger.info(f"Mean Balanced Accuracy: {round(np.mean(tfidf_rf_metrics['Balanced Accuracy']), 2)} ({round(np.std(tfidf_rf_metrics['Balanced Accuracy']), 2)})")
-			logger.info(f"Null Model Balanced Accuracy: {round(np.mean(tfidf_rf_metrics['Balanced Accuracy Null']), 2)} ({round(np.std(tfidf_rf_metrics['Balanced Accuracy Null']), 2)})")
+			logger.info(f"Mean AUC: {round(tfidf_rf_metrics.AUC.mean(), 2)} ({round(tfidf_rf_metrics.AUC.std(), 2)})")
+			logger.info(f"Mean AP: {round(tfidf_rf_metrics.AP.mean(), 2)} ({round(tfidf_rf_metrics.AP.std(), 2)})")
+			logger.info(f"Mean F1: {round(tfidf_rf_metrics.F1.mean(), 2)} ({round(tfidf_rf_metrics.F1.std(), 2)})")
+			logger.info(f"Null Model F1: {round(tfidf_rf_metrics['Null model'].mean(), 2)} ({round(tfidf_rf_metrics['Null model'].std(), 2)})")
+			logger.info(f"Mean Balanced Accuracy: {round(tfidf_rf_metrics['Balanced Accuracy'].mean(), 2)} ({round(tfidf_rf_metrics['Balanced Accuracy'].mean(), 2)})")
+			logger.info(f"Null Model Balanced Accuracy: {round(tfidf_rf_metrics['Balanced Accuracy Null'].mean(), 2)} ({round(tfidf_rf_metrics['Balanced Accuracy Null'].std(), 2)})")
 
 			logger.info("Xgboost")
-			logger.info(f"Mean AUC: {round(np.mean(tfidf_xgb_metrics['AUC']), 2)} ({round(np.std(tfidf_xgb_metrics['AUC']), 2)})")
-			logger.info(f"Mean AP: {round(np.mean(tfidf_xgb_metrics['AP']), 2)} ({round(np.std(tfidf_xgb_metrics['AP']), 2)})")
-			logger.info(f"Mean F1: {round(np.mean(tfidf_xgb_metrics['F1']), 2)} ({round(np.std(tfidf_xgb_metrics['F1']), 2)})")
-			logger.info(f"Null Model F1: {round(np.mean(tfidf_xgb_metrics['Null model']), 2)} ({round(np.std(tfidf_xgb_metrics['Null model']), 2)})")
-			logger.info(f"Mean Balanced Accuracy: {round(np.mean(tfidf_xgb_metrics['Balanced Accuracy']), 2)} ({round(np.std(tfidf_xgb_metrics['Balanced Accuracy']), 2)})")
-			logger.info(f"Null Model Balanced Accuracy: {round(np.mean(tfidf_xgb_metrics['Balanced Accuracy Null']), 2)} ({round(np.std(tfidf_xgb_metrics['Balanced Accuracy Null']), 2)})")
+			logger.info(f"Mean AUC: {round(tfidf_xgb_metrics.AUC.mean(), 2)} ({round(tfidf_xgb_metrics.AUC.std(), 2)})")
+			logger.info(f"Mean AP: {round(tfidf_xgb_metrics.AP.mean(), 2)} ({round(tfidf_xgb_metrics.AP.std(), 2)})")
+			logger.info(f"Mean F1: {round(tfidf_xgb_metrics.F1.mean(), 2)} ({round(tfidf_xgb_metrics.F1.std(), 2)})")
+			logger.info(f"Null Model F1: {round(tfidf_xgb_metrics['Null model'].mean(), 2)} ({round(tfidf_xgb_metrics['Null model'].std(), 2)})")
+			logger.info(f"Mean Balanced Accuracy: {round(tfidf_xgb_metrics['Balanced Accuracy'].mean(), 2)} ({round(tfidf_xgb_metrics['Balanced Accuracy'].std(), 2)})")
+			logger.info(f"Null Model Balanced Accuracy: {round(tfidf_xgb_metrics['Balanced Accuracy Null'].mean(), 2)} ({round(tfidf_xgb_metrics['Balanced Accuracy Null'].std(), 2)})")
 
 			pd.DataFrame(zip(tfidf_rf_metrics['AUC'], tfidf_xgb_metrics['AUC'], tfidf_rf_metrics['AP'], tfidf_xgb_metrics['AP'], tfidf_rf_metrics['Accuracy'], tfidf_xgb_metrics['Accuracy']), 
 			 columns=["RandomForest_AUC", "Xgboost_AUC", "RandomForest_AP", "Xgboost_AP", "RandomForest_Accuracy", "Xgboost_Accuracy"]).to_csv(join(OUT_DIR, f'TfIdf_Results_{trope}.csv'), index=False)
 
 		if train_d2v:
+			d2v_dm_rf_metrics = pd.DataFrame(metrics_dict['d2v-dm-rf']).T
+			d2v_dm_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dm-xgb']).T
+
+			d2v_dm_concat_rf_metrics = pd.DataFrame(metrics_dict['d2v-dm-concat-rf']).T
+			d2v_dm_concat_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dm-concat-xgb']).T
+
+			d2v_dbow_rf_metrics = pd.DataFrame(metrics_dict['d2v-dbow-rf']).T
+			d2v_dbow_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dbow-xgb']).T
+
 			logger.info("Results from Doc2Vec features")
 			logger.info("Random Forest")
 			logger.info(f"Mean AUC: {round(np.mean(d2v_rf_metrics['AUC']), 2)} ({round(np.std(d2v_rf_metrics['AUC']), 2)})")
