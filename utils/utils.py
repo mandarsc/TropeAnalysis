@@ -1,8 +1,11 @@
 import logging
 from os.path import join
 
-HOME_DIR = '/home/mandar/Mandar/Tropes/'
+HOME_DIR = '/Users/manchaudhary/Research/'
 DATA_DIR = join(HOME_DIR, 'TropesDataset')
+MOVIE_TV_TROPES_DATA_DIR = join(DATA_DIR, "MovieTvTropes")
+MOVIE_SCRIPT_DATA_DIR = join(DATA_DIR, "MovieScripts")
+MOVIE_SCRIPT_TROPE_DATA_DIR = join(DATA_DIR, "MovieScriptTropeMatch")
 OUT_DIR = join(HOME_DIR, 'TropeAnalysis', 'output')
 
 

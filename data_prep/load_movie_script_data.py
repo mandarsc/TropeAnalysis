@@ -10,7 +10,7 @@ from gensim.parsing.preprocessing import preprocess_string, remove_stopwords, st
 import numpy as np
 import pandas as pd
 
-from utils.utils import DATA_DIR, configure_logging
+from utils.utils import DATA_DIR, configure_logging, MOVIE_SCRIPT_DATA_DIR, MOVIE_SCRIPT_TROPE_DATA_DIR, MOVIE_TV_TROPES_DATA_DIR
 
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,13 @@ def get_genre_movie_list(genre: str) -> List[str]:
         List[str]: List of strings containing json filenames.
     """
     movie_genre_json_list = []
-    if os.path.exists(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre)):
-        movies_per_genre = os.listdir(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre))
+    # if os.path.exists(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre)):
+    #     movies_per_genre = os.listdir(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre))
+    #     for movie in movies_per_genre:
+    #         if movie.endswith('.json'):
+    #             movie_genre_json_list.append(movie)
+    if os.path.exists(join(MOVIE_SCRIPT_DATA_DIR, genre)):
+        movies_per_genre = os.listdir(join(DATA_DIR, 'MovieScripts', genre))
         for movie in movies_per_genre:
             if movie.endswith('.json'):
                 movie_genre_json_list.append(movie)
@@ -86,7 +91,7 @@ def get_movies_with_tropes() -> pd.DataFrame:
         
         # Find movies that match with TvTropes
         # Read csv file mapping movie names containing script data with their tropes
-        genre_movie_script_trope_df = pd.read_csv(join(DATA_DIR, f'{genre.lower()}_movie_script_trope_match.csv'))
+        genre_movie_script_trope_df = pd.read_csv(join(MOVIE_SCRIPT_TROPE_DATA_DIR, f'{genre.lower()}_movie_script_trope_match.csv'))
         movie_match_df = genre_movie_script_trope_df.loc[genre_movie_script_trope_df.Movie_Script.isin(movie_list)].copy()
         
         logger.info(f"Genre: {genre}, total movies: {len(movie_list)}, movies matched: {len(movie_match_df)}")
@@ -110,8 +115,11 @@ def load_json_movie_dialog_file(genre: str, movie_filename: str) -> List[List[Di
     Returns:
         List[List[Dict[str]]]: List of lists with each nested list containing a dictionary.
     """
-    if os.path.exists(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre, movie_filename)):
-        with open(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre, movie_filename), 'r') as f:
+    # if os.path.exists(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre, movie_filename)):
+    #     with open(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre, movie_filename), 'r') as f:
+    #         movie_dialog_json = json.loads(f.read())
+    if os.path.exists(join(MOVIE_SCRIPT_DATA_DIR, genre, movie_filename)):
+        with open(join(MOVIE_SCRIPT_DATA_DIR, genre, movie_filename), 'r') as f:
             movie_dialog_json = json.loads(f.read())
     else:
         logger.info(f"Path to ScreenPy parser output with {genre}/{movie_filename} does not exist")
@@ -203,7 +211,7 @@ def preprocess_movie_script_data():
 
 def read_tvtropes_json_file():
     # Read json file contianing movie tropes
-    with open(join(DATA_DIR, 'films_tropes_20190501.json'), 'rb') as file:
+    with open(join(MOVIE_TV_TROPES_DATA_DIR, 'films_tropes_20190501.json'), 'rb') as file:
         tvtropes_json_dict = json.load(file)
 
     return tvtropes_json_dict
