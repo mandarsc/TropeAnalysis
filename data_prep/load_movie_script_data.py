@@ -70,6 +70,12 @@ def get_genre_movie_list(genre: str) -> List[str]:
 
 
 def get_movies_with_tropes() -> pd.DataFrame:
+    """
+    This function gets all movies across different genres and find movies with scripts and tropes.
+    Args:
+    Returns:
+        pd.DataFrame: Pandas dataframe containing three columns namely movie names, tropes and genre
+    """
 
     # Read all movie script json files for Action genre
     genres = ['Action', 'Drama', 'Thriller', 'Comedy', 'Crime', 'Romance', 'Adventure', 'Sci-Fi', 'Horror', 
@@ -111,9 +117,7 @@ def load_json_movie_dialog_file(genre: str, movie_filename: str) -> List[List[Di
     Returns:
         List[List[Dict[str]]]: List of lists with each nested list containing a dictionary.
     """
-    # if os.path.exists(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre, movie_filename)):
-    #     with open(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre, movie_filename), 'r') as f:
-    #         movie_dialog_json = json.loads(f.read())
+
     if os.path.exists(join(MOVIE_SCRIPT_DATA_DIR, genre, movie_filename)):
         with open(join(MOVIE_SCRIPT_DATA_DIR, genre, movie_filename), 'r') as f:
             movie_dialog_json = json.loads(f.read())
@@ -161,7 +165,14 @@ def parse_movie_dialog_data(movie_json_data: List[List[Dict[str, str]]],
 
 
 def preprocess_movie_script_data():
-
+    """
+    Preprocess movie scripts by applying few text processing tasks such as lowercase, remove stopwords,
+    remove punctuation and strip words shorter than 3 letters.
+    Args:
+    Returns:
+        Tuple[Dict, Dict]: A tuple of two dictionaries. The first dictionary contains movie as key and movie dialogs as
+        a single string as value. The second dictionary also contains movie as key and list of tropes as value.
+    """
     custom_filters = [lambda x: x.lower(), remove_stopwords, strip_punctuation, strip_short]
 
     all_raw_movie_dialogs = defaultdict()
@@ -206,7 +217,9 @@ def preprocess_movie_script_data():
 
 
 def read_tvtropes_json_file():
-    # Read json file contianing movie tropes
+    """
+    Read json file contianing movie tropes
+    """
     with open(join(MOVIE_TV_TROPES_DATA_DIR, 'films_tropes_20190501.json'), 'rb') as file:
         tvtropes_json_dict = json.load(file)
 
