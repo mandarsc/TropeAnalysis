@@ -57,11 +57,7 @@ def get_genre_movie_list(genre: str) -> List[str]:
         List[str]: List of strings containing json filenames.
     """
     movie_genre_json_list = []
-    # if os.path.exists(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre)):
-    #     movies_per_genre = os.listdir(join(DATA_DIR, 'ScreenPy', 'ParserOutput', genre))
-    #     for movie in movies_per_genre:
-    #         if movie.endswith('.json'):
-    #             movie_genre_json_list.append(movie)
+
     if os.path.exists(join(MOVIE_SCRIPT_DATA_DIR, genre)):
         movies_per_genre = os.listdir(join(DATA_DIR, 'MovieScripts', genre))
         for movie in movies_per_genre:

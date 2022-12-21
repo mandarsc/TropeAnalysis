@@ -26,6 +26,7 @@ logger.setLevel(logging.INFO)
 
 def print_null_model_results(results_df: Dict[str, np.array]):
 	"""
+	This function prints the F1 and balanced accuracy for the null model.
 	"""
 	logger.info(f"Null Model F1: {round(results_df['Null model'].mean(), 2)} ({round(results_df['Null model'].std(), 2)})")
 	logger.info(f"Null Model Balanced Accuracy: {round(results_df['Balanced Accuracy Null'].mean(), 2)} ({round(results_df['Balanced Accuracy Null'].std(), 2)})")
@@ -33,6 +34,7 @@ def print_null_model_results(results_df: Dict[str, np.array]):
 
 def print_model_results(results_df: Dict[str, np.array]):
 	"""
+	This function prints the AUC, AP F1 and balanced accuracy metrics in the results dictionary. 
 	"""
 	logger.info(f"Mean AUC: {round(results_df.AUC.mean(), 2)} ({round(results_df.AUC.std(), 2)})")
 	logger.info(f"Mean AP: {round(results_df.AP.mean(), 2)} ({round(results_df.AP.std(), 2)})")
@@ -42,6 +44,15 @@ def print_model_results(results_df: Dict[str, np.array]):
 
 def extract_tfidf_features(X_train_docs: List[List[str]], X_test_docs: List[List[str]], tfidf_vocab_size: int, ngram_range: int) -> Tuple[np.array, np.array]:
 	"""
+	Extract features from movie scripts using the Term-Frequency Inverse-Document-Frequency (TF-IDF) approach.
+	Args:
+		X_train_docs: List of List of strings where each movie script in training set is converted to a list of string. 
+		X_test_docs: List of List of strings where each movie script in test set is converted to a list of string. 
+		tfidf_vocab_size: Integer containing the max number of features to be used from the TF-IDF matrix.
+		ngram_range: Integer specifying range of tokens to be used for generateing TF-IDF matrix. ngram_range=2 means bigrams will be used as features.
+	Returns:
+		Tuple[np.ndarray, np.ndarray]: Tuple of two numpy arrays where the first array is the training set with TF-IDF features
+		and the second array is teh test set with TF-IDF features.
 	"""
 
 	X_train_tfidf_docs = [' '.join(list(x)) for x in X_train_docs]
@@ -56,6 +67,16 @@ def extract_tfidf_features(X_train_docs: List[List[str]], X_test_docs: List[List
 
 def extract_doc2vec_features(X_train_docs: List[TaggedDocument], X_test_docs: List[TaggedDocument], d2v_size: int) -> Dict[str, pd.DataFrame]:
 	"""
+	Train paragraph vectors from movie scripts using doc2vec algorithm. This function trains paragraph vectors using the
+	Distributed Memory (DM), Distributed Bag-of-Words (DBOW) and DM+DBOW approach. The paragraph vectors are trained using
+	the training set and vectors for test data are inferred.
+	Args:
+		X_train_docs: List of TaggedDocument objects for movie scripts in training set.
+		X_test_docs: List of TaggedDocument objects for movie scripts in test set.
+		d2v_size: Integer containing the size of paragraph vectors.
+	Returns:
+		Dict[str, pd.DataFrame]: Dictionary containing a string as key which indicates the doc2vec algorithm on train and test set
+		and the value is the dataframe which contains the paragraph vectors for each movie script.
 	"""
 	dbow_model = Doc2Vec(X_train_docs, vector_size=d2v_size, min_count=5, dm=0, dbow_words=0)
 	dm_model = Doc2Vec(X_train_docs, vector_size=d2v_size, min_count=5, dm=1, dm_mean=1, dm_concat=0)
