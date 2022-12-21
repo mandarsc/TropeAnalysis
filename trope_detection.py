@@ -114,7 +114,7 @@ def trope_detection(movie_script_dialog: Dict[str, str], movie_tropes_dict: Dict
 	y = multi_label.fit_transform([set(movie_tropes) for movie_tropes in movie_tropes_dict.values()])
 	trope_idx = list(multi_label.classes_).index(trope)
 
-	num_cv_folds = 3
+	num_cv_folds = 10
 
 	if y[:, trope_idx].sum() < 2:
 		logger.info(f"Skipping trope {trope} with less than 2 instances")
@@ -124,48 +124,33 @@ def trope_detection(movie_script_dialog: Dict[str, str], movie_tropes_dict: Dict
 		for i in range(num_cv_folds):
 			if train_tfidf:
 				X_train_docs, X_test_docs, y_train, y_test = train_test_split(list(movie_script_dialog.values()), y[:, trope_idx], shuffle=True, train_size=0.8, stratify=y[:, trope_idx], random_state=random_state[i])
-				logger.info(f"Iteration: {i+1}) {trope} distribution: train ({np.bincount(y_train)}), test ({np.bincount(y_test)})")
+				logger.info(f"TF-IDF CV Fold: {i+1}) {trope} distribution: train ({np.bincount(y_train)}), test ({np.bincount(y_test)})")
 				
 				X_train_tfidf, X_test_tfidf = extract_tfidf_features(X_train_docs, X_test_docs, tfidf_vocab_size, ngram_range=2)
 
-				tfidf_rf_metrics_dict = train_eval_classifiers(X_train_tfidf, X_test_tfidf, y_train, y_test, classifier='rf', n_estimators = rf_estimators)
 				tfidf_xgb_metrics_dict = train_eval_classifiers(X_train_tfidf, X_test_tfidf, y_train, y_test, n_estimators = xgb_estimators)
-	
-				tfidf_rf_metrics[i] = tfidf_rf_metrics_dict
 				tfidf_xgb_metrics[i] = tfidf_xgb_metrics_dict
 
 			if train_d2v:
 				documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(movie_script_dialog.values())]
 				X_train_docs, X_test_docs, y_train, y_test = train_test_split(documents, y[:, trope_idx], shuffle=True, train_size=0.8, stratify=y[:, trope_idx], random_state=random_state[i])
-				logger.info(f"CV Fold: {i+1}) {trope} distribution: train ({np.bincount(y_train)}), test ({np.bincount(y_test)})")
+				logger.info(f"Doc2Vec CV Fold: {i+1}) {trope} distribution: train ({np.bincount(y_train)}), test ({np.bincount(y_test)})")
 
 				X_d2v_docs = extract_doc2vec_features(X_train_docs, X_test_docs, d2v_size)
 
-				# d2v_dm_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_train"], X_d2v_docs["d2v_dm_test"], y_train, y_test, classifier='rf')
-				# d2v_dm_concat_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_concat_train"], X_d2v_docs["d2v_dm_concat_test"], y_train, y_test, classifier='rf')
-				# d2v_dbow_rf_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dbow_train"], X_d2v_docs["d2v_dbow_test"], y_train, y_test, classifier='rf')
-
-				d2v_dm_rf_metrics_dict = defaultdict()
-				d2v_dm_concat_rf_metrics_dict = defaultdict()
-				d2v_dbow_rf_metrics_dict = defaultdict()
-				
 				d2v_dm_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_train"], X_d2v_docs["d2v_dm_test"], y_train, y_test)
 				d2v_dm_concat_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dm_concat_train"], X_d2v_docs["d2v_dm_concat_test"], y_train, y_test)
 				d2v_dbow_xgb_metrics_dict = train_eval_classifiers(X_d2v_docs["d2v_dbow_train"], X_d2v_docs["d2v_dbow_test"], y_train, y_test)
-
-				d2v_dm_rf_metrics[i] = d2v_dm_rf_metrics_dict
-				d2v_dm_concat_rf_metrics[i] = d2v_dm_concat_rf_metrics_dict
-				d2v_dbow_rf_metrics[i] = d2v_dbow_rf_metrics_dict
 
 				d2v_dm_xgb_metrics[i] = d2v_dm_xgb_metrics_dict
 				d2v_dm_concat_xgb_metrics[i] = d2v_dm_concat_xgb_metrics_dict
 				d2v_dbow_xgb_metrics[i] = d2v_dbow_xgb_metrics_dict
 
 	return{
-			"tfidf-rf": tfidf_rf_metrics, "tfidf-xgb": tfidf_xgb_metrics, 
-			"d2v-dm-rf": d2v_dm_rf_metrics, "d2v-dm-xgb": d2v_dm_xgb_metrics, 
-			"d2v-dbow-rf": d2v_dbow_rf_metrics, "d2v-dbow-xgb": d2v_dbow_xgb_metrics,
-			"d2v-dm-concat-rf": d2v_dm_concat_rf_metrics, "d2v-dm-concat-xgb": d2v_dm_concat_xgb_metrics
+			"tfidf-xgb": tfidf_xgb_metrics, 
+			"d2v-dm-xgb": d2v_dm_xgb_metrics, 
+			"d2v-dbow-xgb": d2v_dbow_xgb_metrics,
+			"d2v-dm-concat-xgb": d2v_dm_concat_xgb_metrics
 	}
 
 
@@ -187,91 +172,69 @@ if __name__ == "__main__":
 	tropes_count_dict = Counter(unique_tropes_set)
 
 	tfidf_vocab_size = 50
-	d2v_size_list = [10]
+	d2v_size = 100
 
-	for d2v_size in d2v_size_list:
-		# tropes_of_interest = ['ShoutOut', 'OhCrap', 'ChekhovsGun', 'Foreshadowing', 'BittersweetEnding']
-		tropes_of_interest = ['ShoutOut']
-		logger.info(f"Using top-{len(tropes_of_interest)} frequently occuring tropes")
+	# tropes_of_interest = ['ShoutOut', 'OhCrap', 'ChekhovsGun', 'Foreshadowing', 'BittersweetEnding']
+	tropes_of_interest = ['ShoutOut']
+	logger.info(f"Using top-{len(tropes_of_interest)} frequently occuring tropes")
 
-		logger.info(f"Running trope detection...")
-		for trope in tropes_of_interest:
-			metrics_dict = trope_detection(movie_script_dialog, movie_tropes_dict, tfidf_vocab_size, d2v_size, trope, train_tfidf, train_d2v)
+	logger.info(f"Running trope detection...")
+	for trope in tropes_of_interest:
+		metrics_dict = trope_detection(movie_script_dialog, movie_tropes_dict, tfidf_vocab_size, d2v_size, trope, train_tfidf, train_d2v)
 
-			if train_tfidf:
-				tfidf_rf_metrics = pd.DataFrame(metrics_dict['tfidf-rf']).T
-				tfidf_xgb_metrics = pd.DataFrame(metrics_dict['tfidf-xgb']).T
+		if train_tfidf:
+			tfidf_xgb_metrics = pd.DataFrame(metrics_dict['tfidf-xgb']).T
 
-				logger.info("Results from Tf-Idf features")
-				logger.info("Null Model")
-				print_null_model_results(tfidf_rf_metrics)
-				logger.info("Random Forest")
-				print_model_results(tfidf_rf_metrics)
-				logger.info("Xgboost")
-				print_model_results(tfidf_xgb_metrics)
+			logger.info("Results from Tf-Idf features")
+			logger.info("Null Model")
+			print_null_model_results(tfidf_xgb_metrics)
+			logger.info("Xgboost")
+			print_model_results(tfidf_xgb_metrics)
 
-				pd.DataFrame(
-					zip(
-						tfidf_rf_metrics['AUC'], tfidf_xgb_metrics['AUC'], 
-						tfidf_rf_metrics['AP'], tfidf_xgb_metrics['AP'], 
-						tfidf_rf_metrics['Accuracy'], tfidf_xgb_metrics['Accuracy'], 
-						tfidf_rf_metrics['Balanced Accuracy'], tfidf_xgb_metrics['Balanced Accuracy']
-					), 
-					columns=["RandomForest_AUC", "Xgboost_AUC", "RandomForest_AP", "Xgboost_AP", "RandomForest_Accuracy", "Xgboost_Accuracy", "RandomForest_Balanced_Accuracy", "Xgboost_Balanced_Accuracy"]
-				).to_csv(
-					join(OUT_DIR, f'TfIdf_Results_{trope}.csv'), 
-					index=False
-				)
+			pd.DataFrame(
+				zip(
+					tfidf_xgb_metrics['AUC'], 
+					tfidf_xgb_metrics['AP'], 
+					tfidf_xgb_metrics['Accuracy'], 
+					tfidf_xgb_metrics['Balanced Accuracy']
+				), 
+				columns=["Xgboost_AUC", "Xgboost_AP", "Xgboost_Accuracy", "Xgboost_Balanced_Accuracy"]
+			).to_csv(
+				join(OUT_DIR, f'TfIdf_Results_{trope}.csv'), 
+				index=False
+			)
 
-			if train_d2v:
-				d2v_dm_rf_metrics = pd.DataFrame(metrics_dict['d2v-dm-rf']).T
-				d2v_dm_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dm-xgb']).T
+		if train_d2v:
+			d2v_dm_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dm-xgb']).T
+			d2v_dm_concat_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dm-concat-xgb']).T
+			d2v_dbow_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dbow-xgb']).T
 
-				d2v_dm_concat_rf_metrics = pd.DataFrame(metrics_dict['d2v-dm-concat-rf']).T
-				d2v_dm_concat_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dm-concat-xgb']).T
+			logger.info("====================================================")
+			logger.info(f"Results from Doc2Vec features with vector size: {d2v_size}")
+			logger.info("====================================================")
+			logger.info("Null Model")
+			print_null_model_results(d2v_dm_xgb_metrics)
+			logger.info("Xgboost")
+			logger.info("Distributed Memory")
+			print_model_results(d2v_dm_xgb_metrics)
+			logger.info("Distributed Bag-of-Words")
+			print_model_results(d2v_dbow_xgb_metrics)
+			logger.info("Distributed Memory + Bag-of-Words")
+			print_model_results(d2v_dm_concat_xgb_metrics)
+			logger.info("===================================")
 
-				d2v_dbow_rf_metrics = pd.DataFrame(metrics_dict['d2v-dbow-rf']).T
-				d2v_dbow_xgb_metrics = pd.DataFrame(metrics_dict['d2v-dbow-xgb']).T
+			d2v_dm_xgb_metrics.columns = ["DM_Xgboost_" + x for x in d2v_dm_xgb_metrics.columns]
+			d2v_dbow_xgb_metrics.columns = ["DBOW_Xgboost_" + x for x in d2v_dbow_xgb_metrics.columns]
+			d2v_dm_concat_xgb_metrics.columns = ["DM_DBOW_Xgboost_" + x for x in d2v_dm_concat_xgb_metrics.columns]
 
-				logger.info("====================================================")
-				logger.info(f"Results from Doc2Vec features with vector size: {d2v_size}")
-				logger.info("====================================================")
-				logger.info("Null Model")
-				print_null_model_results(d2v_dm_xgb_metrics)
-				logger.info("Random Forest")
-				logger.info("Distributed Memory")
-				print_model_results(d2v_dm_rf_metrics)
-				logger.info("Distributed Bag-of-Words")
-				print_model_results(d2v_dbow_rf_metrics)
-				logger.info("Distributed Memory + Bag-of-Words")
-				print_model_results(d2v_dm_concat_rf_metrics)
-
-				logger.info("Xgboost")
-				logger.info("Distributed Memory")
-				print_model_results(d2v_dm_xgb_metrics)
-				logger.info("Distributed Bag-of-Words")
-				print_model_results(d2v_dbow_xgb_metrics)
-				logger.info("Distributed Memory + Bag-of-Words")
-				print_model_results(d2v_dm_concat_xgb_metrics)
-				logger.info("===================================")
-
-				d2v_dm_rf_metrics.columns = ["DM_RandomForest_" + x for x in d2v_dm_rf_metrics.columns]
-				d2v_dm_xgb_metrics.columns = ["DM_Xgboost_" + x for x in d2v_dm_xgb_metrics.columns]
-
-				d2v_dbow_rf_metrics.columns = ["DBOW_RandomForest_" + x for x in d2v_dbow_rf_metrics.columns]
-				d2v_dbow_xgb_metrics.columns = ["DBOW_Xgboost_" + x for x in d2v_dbow_xgb_metrics.columns]
-
-				d2v_dm_concat_rf_metrics.columns = ["DM_DBOW_RandomForest_" + x for x in d2v_dm_concat_rf_metrics.columns]
-				d2v_dm_concat_xgb_metrics.columns = ["DM_DBOW_Xgboost_" + x for x in d2v_dm_concat_xgb_metrics.columns]
-
-				pd.concat(
-					[
-						d2v_dm_rf_metrics, d2v_dm_xgb_metrics, d2v_dbow_rf_metrics, d2v_dbow_xgb_metrics, d2v_dm_concat_rf_metrics, d2v_dm_concat_xgb_metrics
-					],
-					axis=1
-			 	).to_csv(
-			 		join(OUT_DIR, f'Doc2Vec_Results_{trope}_d_{d2v_size}.csv'), 
-					index=False
-			 	)
+			pd.concat(
+				[
+					d2v_dm_xgb_metrics, d2v_dbow_xgb_metrics,  d2v_dm_concat_xgb_metrics
+				],
+				axis=1
+		 	).to_csv(
+		 		join(OUT_DIR, f'Doc2Vec_Results_{trope}_d_{d2v_size}.csv'), 
+				index=False
+		 	)
 
 	logger.info(f"Completed training and evaluating models. Time taken: {(datetime.now() - start_time).seconds} seconds")
