@@ -7,7 +7,7 @@
     * ```pip install -r requirements.txt```
 
 ## Dataset
-Please contact the authors at manchaudhary@ebay.com to get access to the datasets.
+The datasets used in this work can be downloaded [here](https://drive.google.com/file/d/1T-Q1lFn8MABs-bDLNv81MFnRHItEu9hq/view?usp=share_link).
 
 ## Trope Prediction
 In this work, we perform trope prediction using two feature extraction methods. Both the approaches are implemented in `trope_prediction.py`. The first approach extracts features from movie scripts using Bag-of-Words (BoW) model implemented with the term-frequency inverse-document frequency method, and the second approach uses doc2vec embedding algorithm for representing movie scripts as embedding vectors.
